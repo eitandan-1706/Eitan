@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+backend/credentials.json
+backend/token.json
+data/songs.db
+data/tmp/
+frontend/node_modules/
+frontend/dist/
+*.egg-info/
+.venv/
