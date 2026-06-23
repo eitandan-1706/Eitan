@@ -100,9 +100,11 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
         async def emit(event: str, **kwargs):
             await q.put(json.dumps({"song": title, "artist": artist, "event": event, **kwargs}))
 
+        loop = asyncio.get_event_loop()
+
         async with sem:
             await emit("searching_drive")
-            existing = drive.search_drive_for_mp3(title, artist)
+            existing = await loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist)
             if existing:
                 await emit("found_on_drive", drive_id=existing["id"], filename=existing["name"])
                 if db_id:
@@ -129,7 +131,8 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
                     await emit("converting")
                     local_file = await convert_to_mp3(local_file, local_file.rsplit(".", 1)[0] + ".mp3")
                 await emit("uploading")
-                result = drive.upload_mp3(local_file, Path(local_file).name, drive.get_or_create_mp3_folder())
+                mp3_folder = await loop.run_in_executor(None, drive.get_or_create_mp3_folder)
+                result = await loop.run_in_executor(None, drive.upload_mp3, local_file, Path(local_file).name, mp3_folder)
                 os.remove(local_file)
                 if db_id:
                     _update_db(db_id, mp3_drive_id=result["id"], mp3_filename=result["name"], youtube_url=yt["url"])
