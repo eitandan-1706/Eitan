@@ -27,7 +27,7 @@ def get_service():
                     "Copy it from your Botty for WhatsApp project."
                 )
             flow = InstalledAppFlow.from_client_secrets_file(settings.credentials_file, settings.drive_scopes)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=8765, open_browser=True, timeout_seconds=120)
         with open(settings.token_file, "w") as f:
             f.write(creds.to_json())
     _service = build("drive", "v3", credentials=creds)
