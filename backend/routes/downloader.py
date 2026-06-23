@@ -123,6 +123,14 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
         async with sem:
             await emit("searching_drive")
             use_existing = True
+            try:
+                existing = await asyncio.wait_for(
+                    loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist),
+                    timeout=15
+                )
+            except asyncio.TimeoutError:
+                existing = None
+                await emit("drive_timeout")
             if existing:
                 if not drive.is_exact_drive_match(existing["name"], title, artist):
                     conf_key = f"{job_id}:{title}:{artist}"
