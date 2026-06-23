@@ -25,7 +25,10 @@ export default function Downloader() {
     if (!allMissing) payload.titles = lines;
     const res = await api.post('/download/batch', payload);
     const jobId = res.data.job_id;
-    if (!allMissing) setQueue(lines.map(t => ({ key: t, title: t, event: 'queued', extra: '' })));
+    if (!allMissing) setQueue(lines.map(t => {
+      const parts = t.split(' - '); const title = parts[0].trim(); const artist = parts.slice(1).join(' - ').trim();
+      return { key: t, title, artist, event: 'queued', extra: '' };
+    }));
     const es = new EventSource(`http://localhost:8000/download/status/${jobId}`);
     esRef.current = es;
     es.onmessage = (e) => {
