@@ -10,6 +10,13 @@ export default function SongDetail() {
   const [form, setForm] = useState({});
   const [downloading, setDownloading] = useState(false);
   const [dlStatus, setDlStatus] = useState('');
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!downloading) { setElapsed(0); return; }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [downloading]);
 
   useEffect(() => {
     api.get(`/songs/${id}`).then(r => { setSong(r.data); setForm(r.data); });
@@ -91,6 +98,14 @@ export default function SongDetail() {
               <button className="btn-primary" onClick={downloadSingle} disabled={downloading}>
                 {downloading ? `⏳ ${dlStatus}` : '⬇ Find & Download MP3'}
               </button>
+              {downloading && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ height: '4px', background: '#2d3148', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: '40%', background: '#a78bfa', borderRadius: '2px', animation: 'slide 1.4s ease-in-out infinite' }} />
+                  </div>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem' }}>{elapsed}s elapsed</p>
+                </div>
+              )}
             </>
           )}
         </div>
