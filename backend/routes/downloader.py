@@ -122,7 +122,7 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
 
         async with sem:
             await emit("searching_drive")
-            existing = await loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist)
+            use_existing = True
             if existing:
                 if not drive.is_exact_drive_match(existing["name"], title, artist):
                     conf_key = f"{job_id}:{title}:{artist}"
@@ -133,25 +133,22 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
                         await asyncio.wait_for(ev.wait(), timeout=300)
                     except asyncio.TimeoutError:
                         _pending_confirmations.pop(conf_key, None)
-                        await emit("skipped", reason="confirmation_timeout")
-                        _jobs[job_id]["done"] += 1
-                        _jobs[job_id]["results"].append({"title": title, "status": "skipped"})
-                        return
-                    proceed = _confirmation_decisions.pop(conf_key, False)
-                    _pending_confirmations.pop(conf_key, None)
-                    if not proceed:
-                        await emit("skipped", reason="user_rejected")
-                        _jobs[job_id]["done"] += 1
-                        _jobs[job_id]["results"].append({"title": title, "status": "skipped"})
-                        return
-                mp3_folder = await loop.run_in_executor(None, drive.get_or_create_mp3_folder)
-                moved = await loop.run_in_executor(None, drive.move_and_rename_mp3, existing["id"], title, artist, mp3_folder)
-                await emit("found_on_drive", drive_id=moved["id"], filename=moved["name"])
-                if db_id:
-                    _update_db(db_id, mp3_drive_id=moved["id"], mp3_filename=moved["name"])
-                _jobs[job_id]["done"] += 1
-                _jobs[job_id]["results"].append({"title": title, "status": "found_on_drive"})
-                return
+                        use_existing = False
+                    else:
+                        proceed = _confirmation_decisions.pop(conf_key, False)
+                        _pending_confirmations.pop(conf_key, None)
+                        if not proceed:
+                            use_existing = False
+
+                if use_existing:
+                    mp3_folder = await loop.run_in_executor(None, drive.get_or_create_mp3_folder)
+                    moved = await loop.run_in_executor(None, drive.move_and_rename_mp3, existing["id"], title, artist, mp3_folder)
+                    await emit("found_on_drive", drive_id=moved["id"], filename=moved["name"])
+                    if db_id:
+                        _update_db(db_id, mp3_drive_id=moved["id"], mp3_filename=moved["name"])
+                    _jobs[job_id]["done"] += 1
+                    _jobs[job_id]["results"].append({"title": title, "status": "found_on_drive"})
+                    return
             await emit("searching_youtube")
             try:
                 results = await search_youtube(title, artist, limit=1)
