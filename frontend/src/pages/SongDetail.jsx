@@ -48,7 +48,7 @@ export default function SongDetail() {
           src.close(); setDownloading(false);
           api.get(`/songs/${id}`).then(r => setSong(r.data));
         }
-        if (d.event === 'error') { setDlStatus('Error: ' + d.reason); src.close(); setDownloading(false); }
+        if (d.event === 'error') { setDlStatus('❌ ' + d.reason); src.close(); setDownloading(false); }
       } catch {}
     };
   };
@@ -95,6 +95,7 @@ export default function SongDetail() {
           ) : (
             <>
               <p style={{ color: '#64748b', marginBottom: '0.5rem' }}>No MP3 yet</p>
+              {dlStatus && !downloading && <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.5rem', wordBreak: 'break-word' }}>{dlStatus}</p>}
               <button className="btn-primary" onClick={downloadSingle} disabled={downloading}>
                 {downloading ? `⏳ ${dlStatus}` : '⬇ Find & Download MP3'}
               </button>

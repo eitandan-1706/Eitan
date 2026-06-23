@@ -186,6 +186,7 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
                 _jobs[job_id]["done"] += 1
                 _jobs[job_id]["results"].append({"title": title, "status": "downloaded"})
             except Exception as e:
+                import traceback; traceback.print_exc()
                 await emit("error", reason=str(e))
                 _jobs[job_id]["done"] += 1
                 _jobs[job_id]["results"].append({"title": title, "status": "error", "reason": str(e)})
