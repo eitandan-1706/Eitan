@@ -66,6 +66,21 @@ def search_drive_for_mp3(title: str, artist: str) -> dict | None:
     return None
 
 
+def move_and_rename_mp3(file_id: str, title: str, artist: str, folder_id: str) -> dict:
+    svc = get_service()
+    new_name = f"{title} - {artist}.mp3" if artist else f"{title}.mp3"
+    new_name = "".join(c for c in new_name if c not in r'\/:*?"<>|')
+    file_meta = svc.files().get(fileId=file_id, fields="parents").execute()
+    old_parents = ",".join(file_meta.get("parents", []))
+    return svc.files().update(
+        fileId=file_id,
+        addParents=folder_id,
+        removeParents=old_parents,
+        body={"name": new_name},
+        fields="id, name"
+    ).execute()
+
+
 def upload_mp3(local_path: str, filename: str, folder_id: str) -> dict:
     svc = get_service()
     return svc.files().create(

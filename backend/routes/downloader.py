@@ -106,9 +106,11 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
             await emit("searching_drive")
             existing = await loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist)
             if existing:
-                await emit("found_on_drive", drive_id=existing["id"], filename=existing["name"])
+                mp3_folder = await loop.run_in_executor(None, drive.get_or_create_mp3_folder)
+                moved = await loop.run_in_executor(None, drive.move_and_rename_mp3, existing["id"], title, artist, mp3_folder)
+                await emit("found_on_drive", drive_id=moved["id"], filename=moved["name"])
                 if db_id:
-                    _update_db(db_id, mp3_drive_id=existing["id"], mp3_filename=existing["name"])
+                    _update_db(db_id, mp3_drive_id=moved["id"], mp3_filename=moved["name"])
                 _jobs[job_id]["done"] += 1
                 _jobs[job_id]["results"].append({"title": title, "status": "found_on_drive"})
                 return
