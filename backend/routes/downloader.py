@@ -16,6 +16,8 @@ from backend.config import settings
 router = APIRouter(prefix="/download", tags=["download"])
 _jobs: dict[str, dict] = {}
 _job_queues: dict[str, asyncio.Queue] = {}
+_pending_confirmations: dict[str, asyncio.Event] = {}
+_confirmation_decisions: dict[str, bool] = {}
 
 
 class BatchRequest(BaseModel):
@@ -29,6 +31,22 @@ class SearchRequest(BaseModel):
     title: str
     artist: str
     limit: int = 3
+
+
+class ConfirmRequest(BaseModel):
+    conf_key: str
+    proceed: bool
+
+
+@router.post("/confirm")
+async def confirm_match(req: ConfirmRequest):
+    event = _pending_confirmations.get(req.conf_key)
+    if not event:
+        from fastapi import HTTPException
+        raise HTTPException(404, "No pending confirmation with that key")
+    _confirmation_decisions[req.conf_key] = req.proceed
+    event.set()
+    return {"ok": True}
 
 
 @router.post("/search")
@@ -106,6 +124,26 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
             await emit("searching_drive")
             existing = await loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist)
             if existing:
+                if not drive.is_exact_drive_match(existing["name"], title, artist):
+                    conf_key = f"{job_id}:{title}:{artist}"
+                    ev = asyncio.Event()
+                    _pending_confirmations[conf_key] = ev
+                    await emit("needs_confirmation", found_name=existing["name"], conf_key=conf_key)
+                    try:
+                        await asyncio.wait_for(ev.wait(), timeout=300)
+                    except asyncio.TimeoutError:
+                        _pending_confirmations.pop(conf_key, None)
+                        await emit("skipped", reason="confirmation_timeout")
+                        _jobs[job_id]["done"] += 1
+                        _jobs[job_id]["results"].append({"title": title, "status": "skipped"})
+                        return
+                    proceed = _confirmation_decisions.pop(conf_key, False)
+                    _pending_confirmations.pop(conf_key, None)
+                    if not proceed:
+                        await emit("skipped", reason="user_rejected")
+                        _jobs[job_id]["done"] += 1
+                        _jobs[job_id]["results"].append({"title": title, "status": "skipped"})
+                        return
                 mp3_folder = await loop.run_in_executor(None, drive.get_or_create_mp3_folder)
                 moved = await loop.run_in_executor(None, drive.move_and_rename_mp3, existing["id"], title, artist, mp3_folder)
                 await emit("found_on_drive", drive_id=moved["id"], filename=moved["name"])

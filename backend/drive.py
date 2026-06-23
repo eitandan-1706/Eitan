@@ -1,4 +1,5 @@
 import io
+import unicodedata
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -8,6 +9,18 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from backend.config import settings
 
 _service = None
+
+
+def _normalize(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.lower().split())
+
+
+def is_exact_drive_match(found_name: str, title: str, artist: str) -> bool:
+    stem = found_name.rsplit(".", 1)[0]
+    n = _normalize(stem)
+    return n == _normalize(f"{title} - {artist}") or n == _normalize(f"{artist} - {title}")
 
 
 def get_service():
