@@ -123,6 +123,7 @@ async def _run_batch(job_id: str, songs: list[dict], auto_mode: bool, q: asyncio
         async with sem:
             await emit("searching_drive")
             use_existing = True
+            existing = None
             try:
                 existing = await asyncio.wait_for(
                     loop.run_in_executor(None, drive.search_drive_for_mp3, title, artist),
