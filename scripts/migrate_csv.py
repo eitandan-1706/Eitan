@@ -47,11 +47,25 @@ def import_csv(csv_path: str):
 
 
 def link_drive_images():
-    from backend import drive as drv
+    from backend.drive import get_service
     db = SessionLocal()
-    print("Scanning Drive for PNG chord sheets...")
-    files = drv.list_files_in_folder(settings.drive_root_folder_id)
-    png_map = {f["name"]: f["id"] for f in files if f.get("name", "").startswith("song_") and f["name"].endswith(".png")}
+    print("Searching Drive for song_*.png chord sheets...")
+    svc = get_service()
+    png_map = {}
+    page_token = None
+    while True:
+        resp = svc.files().list(
+            q="name contains 'song_' and mimeType = 'image/png' and trashed = false",
+            fields="nextPageToken, files(id, name)",
+            pageSize=1000,
+            pageToken=page_token,
+        ).execute()
+        for f in resp.get("files", []):
+            png_map[f["name"]] = f["id"]
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
+    print(f"Found {len(png_map)} PNG files on Drive")
     updated = 0
     for song in db.query(Song).filter(Song.image_filename.isnot(None), Song.image_drive_id.is_(None)).all():
         if song.image_filename in png_map:
@@ -59,7 +73,7 @@ def link_drive_images():
             updated += 1
     db.commit()
     db.close()
-    print(f"Linked {updated} chord sheet PNGs from Drive")
+    print(f"Linked {updated} chord sheet PNGs")
 
 
 def link_drive_mp3s():
@@ -88,10 +102,11 @@ def link_drive_mp3s():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", default="data/songs_all.csv")
+    parser.add_argument("--csv", default=None)
     parser.add_argument("--link-drive", action="store_true")
     args = parser.parse_args()
-    import_csv(args.csv)
+    if args.csv:
+        import_csv(args.csv)
     if args.link_drive:
         link_drive_images()
         link_drive_mp3s()
