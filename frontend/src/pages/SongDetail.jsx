@@ -33,6 +33,9 @@ export default function SongDetail() {
     src.onmessage = e => {
       try {
         const d = JSON.parse(e.data);
+        if (d.event === 'needs_confirmation') {
+          api.post('/download/confirm', { conf_key: d.conf_key, proceed: false });
+        }
         if (d.event) setDlStatus(d.event.replace(/_/g, ' '));
         if (d.event === 'done' || d.event === 'found_on_drive') {
           src.close(); setDownloading(false);
